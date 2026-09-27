@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neo T. Maredi — Pipeline to Turbine</title>
+<meta name="description" content="Senior industrial automation engineer. SCADA, ICS and rotating equipment work, applied to wind O&amp;M digital operations.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Narrow:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --shell:#EDEDE9;
+  --shell-mid:#E5E5DF;
+  --shell-deep:#DBDBD4;
+  --surface:#F7F7F5;
+  --anthracite:#2B2E31;
+  --steel:#8A9199;
+  --steel-line:#C9CCCE;
+  --signal:#E8551F;
+  --ink:#16181A;
+
+  --display:'Archivo Narrow','Archivo',system-ui,sans-serif;
+  --body:'Archivo',system-ui,-apple-system,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;
+
+  --measure:64ch;
+  --gutter:clamp(20px,5vw,64px);
+}
+:root[data-theme="dark"]{
+  --shell:#16181A;
+  --shell-mid:#1B1E21;
+  --shell-deep:#212529;
+  --surface:#1E2124;
+  --anthracite:#E4E5E3;
+  --steel:#7E858C;
+  --steel-line:#33383C;
+  --ink:#F2F2F0;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;background:var(--shell)}
+body{
+  margin:0;
+  min-height:100vh;
+  background:linear-gradient(180deg,var(--shell) 0%,var(--shell) 22%,var(--shell-mid) 62%,var(--shell-deep) 100%);
+  color:var(--anthracite);
+  font-family:var(--body);
+  font-size:17px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  transition:color 200ms linear;
+}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--signal);outline-offset:3px}
+
+.wrap{max-width:1180px;margin:0 auto;padding:0 var(--gutter)}
+
+/* ---------- masthead ---------- */
+.masthead{
+  display:flex;align-items:baseline;justify-content:space-between;
+  gap:24px;padding:22px 0 18px;border-bottom:1px solid var(--steel-line);flex-wrap:wrap;
+}
+.mark{
+  font-family:var(--display);font-weight:600;font-size:15px;
+  letter-spacing:.02em;color:var(--ink);text-decoration:none;
+}
+.mark span{color:var(--signal)}
+.masthead nav{display:flex;gap:26px;align-items:baseline;font-size:14px;color:var(--steel)}
+.masthead nav a{
+  text-decoration:none;padding-bottom:2px;border-bottom:1px solid transparent;
+  transition:color 120ms linear,border-color 120ms linear;
+}
+.masthead nav a:hover{color:var(--ink);border-color:var(--signal)}
+.toggle{
+  font:inherit;font-size:13px;color:var(--steel);background:none;
+  border:1px solid var(--steel-line);padding:4px 10px;cursor:pointer;
+  transition:transform 90ms cubic-bezier(.2,0,0,1),border-color 120ms linear,color 120ms linear;
+}
+.toggle:hover{color:var(--ink);border-color:var(--steel)}
+.toggle:active{transform:translateY(1px)}
+
+/* ---------- hero ---------- */
+.hero{padding:0 0 clamp(56px,9vw,110px)}
+.plot{position:relative;width:100%;height:clamp(320px,46vh,480px);margin:clamp(24px,4vw,44px) 0 clamp(30px,4vw,52px)}
+.plot canvas{display:block;width:100%;height:100%}
+.plot-note{position:absolute;right:0;bottom:-22px;font-size:11.5px;color:var(--steel);letter-spacing:.01em}
+
+h1{
+  font-family:var(--display);font-weight:600;color:var(--ink);
+  font-size:clamp(42px,8.4vw,96px);line-height:.95;letter-spacing:-.018em;
+  margin:0 0 24px;max-width:14ch;
+}
+.lede{max-width:52ch;font-size:clamp(17px,1.35vw,19px);margin:0 0 32px}
+.actions{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.btn{
+  font:inherit;font-size:15px;text-decoration:none;padding:11px 20px;
+  border:1px solid var(--ink);background:var(--ink);color:var(--shell);
+  transition:transform 90ms cubic-bezier(.2,0,0,1),background 120ms linear,border-color 120ms linear;
+}
+.btn:hover{background:var(--signal);border-color:var(--signal)}
+.btn:active{transform:translateY(1px)}
+.btn.ghost{background:none;color:var(--ink);border-color:var(--steel-line)}
+.btn.ghost:hover{border-color:var(--ink);background:none;color:var(--ink)}
+
+.stagger{opacity:0;transform:translateY(10px)}
+.stagger.in{opacity:1;transform:none;transition:opacity 520ms linear,transform 520ms cubic-bezier(.2,0,0,1)}
+
+/* ---------- shift bar ---------- */
+.shift{
+  margin-top:clamp(40px,6vw,64px);
+  border-top:1px solid var(--steel-line);
+  border-bottom:1px solid var(--steel-line);
+  padding:16px 0 14px;
+  font-family:var(--mono);
+}
+.shift-head{
+  display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  font-size:12px;letter-spacing:.04em;margin-bottom:11px;flex-wrap:wrap;
+}
+.shift-from{color:var(--anthracite)}
+.shift-from b,.shift-to b{font-weight:600}
+.shift-to{color:var(--signal)}
+.shift-pct{color:var(--steel);font-variant-numeric:tabular-nums}
+.shift-track{
+  position:relative;height:9px;width:100%;
+  background:var(--steel-line);overflow:hidden;
+}
+.shift-fill{
+  position:absolute;inset:0 auto 0 0;width:0;
+  background:linear-gradient(90deg,var(--anthracite) 0%,var(--steel) 46%,var(--signal) 100%);
+}
+.shift-fill::after{
+  content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(115deg,rgba(255,255,255,.22) 0 2px,transparent 2px 7px);
+}
+.shift-stages{
+  list-style:none;margin:11px 0 0;padding:0;
+  display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+  font-size:11.5px;letter-spacing:.03em;
+}
+.shift-stages li{color:var(--steel);transition:color 160ms linear}
+.shift-stages li.on{color:var(--anthracite)}
+.shift-stages li.on:last-child{color:var(--signal)}
+.shift-stages b{font-weight:600;margin-right:6px;color:inherit;opacity:.62}
+.shift-stages li:nth-child(2),.shift-stages li:nth-child(3){text-align:center}
+.shift-stages li:last-child{text-align:right}
+@media (max-width:680px){
+  .shift-head{font-size:11px}
+  .shift-pct{order:3;width:100%}
+  .shift-stages{grid-template-columns:repeat(2,1fr);gap:7px 14px}
+  .shift-stages li,.shift-stages li:nth-child(2),.shift-stages li:nth-child(3),.shift-stages li:last-child{text-align:left}
+}
+
+/* ---------- sections ---------- */
+section{padding:clamp(56px,8vw,104px) 0;position:relative}
+section::before{
+  content:"";position:absolute;left:0;right:0;top:0;height:1px;background:var(--steel-line);
+  transform:scaleX(0);transform-origin:left;
+  transition:transform 900ms cubic-bezier(.16,1,.3,1);
+}
+section.seen::before{transform:scaleX(1)}
+h2{
+  font-family:var(--display);font-weight:600;color:var(--ink);
+  font-size:clamp(26px,3.4vw,38px);line-height:1.1;letter-spacing:-.01em;
+  margin:0 0 28px;max-width:20ch;
+}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.55fr);gap:clamp(28px,5vw,72px)}
+@media (max-width:860px){.split{grid-template-columns:1fr;gap:24px}}
+.prose p{max-width:var(--measure);margin:0 0 18px}
+.prose p:last-child{margin-bottom:0}
+.prose strong{color:var(--ink);font-weight:600}
+
+/* ---------- work ---------- */
+.projects{display:flex;flex-direction:column;border-top:1px solid var(--steel-line)}
+.project{
+  display:block;text-decoration:none;border-bottom:1px solid var(--steel-line);
+  padding:26px 0;position:relative;
+  transition:padding-left 130ms cubic-bezier(.2,0,0,1),background 130ms linear;
+}
+.project::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--signal);
+  transform:scaleY(0);transform-origin:top;transition:transform 150ms cubic-bezier(.2,0,0,1);
+}
+.project:hover,.project:focus-visible{padding-left:20px;background:var(--surface)}
+.project:hover::before,.project:focus-visible::before{transform:scaleY(1)}
+.project.lead{padding-top:34px;padding-bottom:34px}
+.project-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+.project-name{
+  font-family:var(--display);font-weight:600;color:var(--ink);
+  font-size:clamp(22px,2.6vw,30px);letter-spacing:-.005em;
+}
+.project.lead .project-name{font-size:clamp(26px,3.4vw,38px)}
+.status{font-size:12px;color:var(--steel);border:1px solid var(--steel-line);padding:2px 8px;white-space:nowrap}
+.status.live{color:var(--signal);border-color:var(--signal)}
+.project-desc{max-width:var(--measure);margin:0 0 14px}
+.metrics{display:flex;flex-wrap:wrap;margin:0 0 12px;border-left:1px solid var(--steel-line)}
+.metric{padding:2px 22px 2px 14px}
+.metric b{
+  display:block;font-family:var(--display);font-size:clamp(19px,2.1vw,24px);
+  font-weight:600;color:var(--ink);line-height:1.2;
+}
+.metric span{font-size:12.5px;color:var(--steel)}
+.stack{font-size:13.5px;color:var(--steel);max-width:var(--measure)}
+.repo{display:inline-block;margin-top:12px;font-size:14px;color:var(--ink);border-bottom:1px solid var(--signal);padding-bottom:1px}
+
+/* ---------- credentials ---------- */
+.creds{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));border-top:1px solid var(--steel-line)}
+.cred{padding:20px 24px 20px 0;border-bottom:1px solid var(--steel-line)}
+.cred h3{font-family:var(--display);font-size:17px;font-weight:600;color:var(--ink);margin:0 0 4px;line-height:1.25}
+.cred p{margin:0;font-size:13.5px;color:var(--steel)}
+.cred .flag{display:inline-block;margin-top:8px;font-size:11.5px;letter-spacing:.02em;padding:2px 7px;border:1px solid var(--steel-line);color:var(--steel)}
+.cred .flag.held{color:var(--signal);border-color:var(--signal)}
+.courses{margin-top:26px;font-size:14px;color:var(--steel);max-width:var(--measure)}
+
+/* ---------- contact ---------- */
+.contact-links{display:flex;flex-wrap:wrap;gap:0 40px;margin-top:8px}
+.contact-links a{
+  font-family:var(--display);font-size:clamp(18px,2.2vw,25px);font-weight:600;
+  color:var(--ink);text-decoration:none;padding:6px 0;border-bottom:1px solid transparent;
+  transition:border-color 120ms linear,color 120ms linear;
+}
+.contact-links a:hover{color:var(--signal);border-color:var(--signal)}
+.availability{margin-top:26px;max-width:var(--measure)}
+
+footer{
+  border-top:1px solid var(--steel-line);padding:24px 0 40px;font-size:13px;color:var(--steel);
+  display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
+}
+
+@media (prefers-reduced-motion:reduce){
+  *{transition-duration:1ms!important;animation-duration:1ms!important}
+  .stagger{opacity:1;transform:none}
+  section::before{transform:scaleX(1)}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="masthead">
+    <a class="mark" href="#top">NEO T. MAREDI <span>/</span> PIPELINE <span>&#8594;</span> TURBINE</a>
+    <nav>
+      <a href="#transfer">The transfer</a>
+      <a href="#work">Work</a>
+      <a href="#credentials">Credentials</a>
+      <a href="#contact">Contact</a>
+      <button class="toggle" id="themeToggle" aria-label="Switch to dark theme">Dark</button>
+    </nav>
+  </header>
+</div>
+
+<main id="top">
+<div class="wrap">
+  <section class="hero" style="padding-top:0">
+    <div class="plot">
+      <canvas id="hero" role="img" aria-label="Two turbines on the same site plotted against wind speed. One tracks its reference power curve; the other falls below it above 8 metres per second, showing a measurable annual energy shortfall."></canvas>
+      <div class="plot-note" id="plotNote">Same wind, two turbines &middot; synthetic sample</div>
+    </div>
+
+    <h1 class="stagger" id="h1">Same discipline.<br>New prime&nbsp;mover.</h1>
+    <p class="lede stagger" id="lede">Senior industrial automation engineer &mdash; SCADA, ICS, DCS and rotating equipment inspection across oil and gas. Now building the tooling for wind O&amp;M digital operations.</p>
+    <div class="actions stagger" id="actions">
+      <a class="btn" href="#work">View the work</a>
+      <a class="btn ghost" href="#contact">Get in touch</a>
+    </div>
+
+    <div class="shift" id="shift">
+      <div class="shift-head">
+        <span class="shift-from"><b>PIPELINE</b> [ SCADA / ICS / DCS ]</span>
+        <span class="shift-pct">SHIFT: <span id="shiftPct">0%</span></span>
+        <span class="shift-to"><b>TURBINE</b> [ WIND ASSET PERFORMANCE ]</span>
+      </div>
+      <div class="shift-track" role="img" aria-label="Transition from pipeline control systems to wind asset performance, via historian telemetry, alarm rationalisation, IEC 61400 power curves and asset degradation analysis.">
+        <div class="shift-fill" id="shiftFill"></div>
+      </div>
+      <ol class="shift-stages" id="shiftStages">
+        <li><b>01</b>HISTORIAN TELEMETRY</li>
+        <li><b>02</b>ALARM RATIONALISATION</li>
+        <li><b>03</b>IEC 61400 POWER CURVES</li>
+        <li><b>04</b>ASSET DEGRADATION</li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="transfer">
+    <div class="split">
+      <h2>What transfers from oil and gas to wind.</h2>
+      <div class="prose">
+        <p>Wind turbines and gas turbines produce the same class of operational data: tag-level telemetry at fixed intervals, alarm streams requiring rationalisation, and vibration signatures that indicate degradation ahead of any drop in output.</p>
+        <p>My background is that work in oil and gas &mdash; SCADA historians, DCS logic, alarm management, and rotating equipment condition monitoring. Currently contracted to <strong>T&Uuml;V Rheinland</strong> in Saudi Arabia's Eastern Province.</p>
+        <p>What carries over directly: data quality assessment on production historians, alarm rationalisation, condition-based maintenance planning, and reconciling reported availability against source records.</p>
+        <p>Wind-specific work is deliberate and current. <strong>GWO certified</strong>. IEC 61400 methods implemented in code rather than referenced in slides. Tooling built and tested against real turbine datasets.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="work">
+    <h2>Work</h2>
+    <div class="projects">
+
+      <a class="project lead" href="https://github.com/neo-t-maredi/windforge">
+        <div class="project-head">
+          <span class="project-name">windforge</span>
+          <span class="status live">Live</span>
+        </div>
+        <p class="project-desc">Wind site feasibility tool. Pulls Global Wind Atlas GeoTIFF rasters, fits a Weibull distribution to the resource, and returns annual energy production to IEC 61400-12-1 with a CRF-based levelised cost of energy and jurisdiction flags.</p>
+        <div class="metrics">
+          <div class="metric"><b>IEC 61400-12-1</b><span>AEP methodology</span></div>
+          <div class="metric"><b>Weibull</b><span>resource fitting</span></div>
+          <div class="metric"><b>CRF</b><span>LCOE model</span></div>
+        </div>
+        <p class="stack">FastAPI &middot; React &middot; rasterio &middot; Docker &middot; structured logging &middot; rate limiting</p>
+        <span class="repo">github.com/neo-t-maredi/windforge</span>
+      </a>
+
+      <a class="project" href="#work">
+        <div class="project-head">
+          <span class="project-name">scada-norm</span>
+          <span class="status live">Live</span>
+        </div>
+        <p class="project-desc">Rust CLI that normalises Kelmarsh wind farm SCADA exports into a canonical 11-column Parquet schema &mdash; designed against 299 real CSV columns, so it survives contact with actual vendor exports.</p>
+        <div class="metrics">
+          <div class="metric"><b>52,704</b><span>rows normalised</span></div>
+          <div class="metric"><b>78 MB &#8594; 3.9 MB</b><span>Snappy compression</span></div>
+          <div class="metric"><b>0</b><span>parse failures</span></div>
+        </div>
+        <p class="stack">Rust &middot; Arrow 59.1 &middot; Parquet &middot; 10 unit tests + integration &middot; verified against pyarrow</p>
+        <span class="repo">Repository</span>
+      </a>
+
+      <a class="project" href="#work">
+        <div class="project-head">
+          <span class="project-name">sharqnet</span>
+          <span class="status">In progress</span>
+        </div>
+        <p class="project-desc">Microgrid telemetry platform for Eastern Province deployment. Rust meter agents publish to Mosquitto, land in TimescaleDB, and surface through a FastAPI service to a React front end.</p>
+        <p class="stack">Rust &middot; MQTT &middot; TimescaleDB &middot; FastAPI &middot; React</p>
+      </a>
+
+    </div>
+  </section>
+
+  <section id="credentials">
+    <h2>Field credentials</h2>
+    <div class="creds">
+      <div class="cred">
+        <h3>GWO Basic Safety Training</h3>
+        <p>Global Wind Academy, Ho Chi Minh City &middot; Jul&ndash;Aug 2026</p>
+        <span class="flag held">Held</span>
+      </div>
+      <div class="cred">
+        <h3>GWO Basic Technical Training</h3>
+        <p>Global Wind Academy, Ho Chi Minh City &middot; Jul&ndash;Aug 2026</p>
+        <span class="flag held">Held</span>
+      </div>
+      <div class="cred">
+        <h3>NEBOSH IGC</h3>
+        <p>International General Certificate</p>
+        <span class="flag">In progress</span>
+      </div>
+      <div class="cred">
+        <h3>Ignition Core Certification</h3>
+        <p>Inductive Automation</p>
+        <span class="flag">Scheduled Oct 2026</span>
+      </div>
+      <div class="cred">
+        <h3>IRATA Level 1</h3>
+        <p>Rope access</p>
+        <span class="flag">Planned Q1 2027</span>
+      </div>
+    </div>
+    <p class="courses">Also: Petroleum Engineering with AI Applications (L&amp;T EduTech) &middot; Oil &amp; Gas and Electric Industry Operations (Duke) &middot; Energy Production, Distribution and Safety (SUNY).</p>
+  </section>
+
+  <section id="contact">
+    <h2>Contact</h2>
+    <div class="contact-links">
+      <a href="#" id="mail">Email</a>
+      <a href="https://github.com/neo-t-maredi">GitHub</a>
+      <a href="#">LinkedIn</a>
+    </div>
+    <p class="availability">Based in the Eastern Province, Saudi Arabia. Open to wind O&amp;M and asset performance roles across MENA and Europe.</p>
+  </section>
+</div>
+
+<div class="wrap">
+  <footer>
+    <span>Neo T. Maredi &mdash; industrial automation, wind O&amp;M digital operations</span>
+    <span>Hero data is a synthetic sample. Production build uses the Kelmarsh open dataset.</span>
+  </footer>
+</div>
+</main>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- theme ---------- */
+  var root=document.documentElement, tog=document.getElementById('themeToggle');
+  var stored=null;
+  try{stored=localStorage.getItem('theme');}catch(e){}
+  var initial=stored||(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+  applyTheme(initial);
+  function applyTheme(t){
+    root.setAttribute('data-theme',t);
+    tog.textContent=(t==='dark')?'Light':'Dark';
+    tog.setAttribute('aria-label','Switch to '+(t==='dark'?'light':'dark')+' theme');
+  }
+  tog.addEventListener('click',function(){
+    var next=root.getAttribute('data-theme')==='dark'?'light':'dark';
+    applyTheme(next);
+    try{localStorage.setItem('theme',next);}catch(e){}
+    draw(lastT);
+  });
+
+  /* ---------- mail ---------- */
+  var m=document.getElementById('mail');
+  var user='neo.maredi.dev', dom='gmail.com';
+  m.href='mailto:'+user+'@'+dom;
+  m.textContent=user+'@'+dom;
+
+  /* ---------- shift bar ---------- */
+  var fillEl=document.getElementById('shiftFill'),
+      pctEl=document.getElementById('shiftPct'),
+      stageEls=[].slice.call(document.querySelectorAll('#shiftStages li'));
+  function setShift(f){
+    fillEl.style.width=(f*100).toFixed(2)+'%';
+    pctEl.textContent=Math.round(f*100)+'%';
+    stageEls.forEach(function(el,i){
+      el.classList.toggle('on', f >= (i+1)/stageEls.length - 0.08);
+    });
+  }
+  function runShift(){
+    var t0=null, DURS=2600, DELAY=900;
+    setTimeout(function(){
+      (function s(ts){
+        if(t0===null)t0=ts;
+        var p=Math.min(1,(ts-t0)/DURS);
+        setShift(p<0.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2);
+        if(p<1)requestAnimationFrame(s);
+      })(performance.now());
+    },DELAY);
+  }
+
+  /* ---------- section rules ---------- */
+  var secs=[].slice.call(document.querySelectorAll('section'));
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(en){
+      en.forEach(function(e){ if(e.isIntersecting){e.target.classList.add('seen');io.unobserve(e.target);} });
+    },{rootMargin:'0px 0px -12% 0px'});
+    secs.forEach(function(s){io.observe(s);});
+  }else{ secs.forEach(function(s){s.classList.add('seen');}); }
+
+  /* ---------- data ---------- */
+  function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+  var rnd=mulberry32(20260903);
+  function gauss(){var u=0,v=0;while(u===0)u=rnd();while(v===0)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+  function normCdf(x){
+    var t=1/(1+0.2316419*Math.abs(x)), d=0.3989423*Math.exp(-x*x/2);
+    var p=d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));
+    return x>0?1-p:p;
+  }
+
+  var N=1000, K=2.05, C=8.4, RATED=2000, CUTIN=3, RATEDWS=13, CUTOUT=25;
+
+  // reference machine — as warranted
+  function refCurve(ws){
+    if(ws<CUTIN||ws>CUTOUT)return 0;
+    if(ws>=RATEDWS)return RATED;
+    var a=Math.pow(ws,3)-Math.pow(CUTIN,3), b=Math.pow(RATEDWS,3)-Math.pow(CUTIN,3);
+    return RATED*(a/b);
+  }
+  // T07 — tracks reference until ~8 m/s, then falls away and reaches rated late and low.
+  // Signature of pitch misalignment / blade degradation, not a fault the SCADA alarms on.
+  function degCurve(ws){
+    var base=refCurve(ws);
+    if(base<=0)return 0;
+    if(ws<=8)return base;
+    var span=Math.min(1,(ws-8)/6);
+    var loss=0.055+0.135*span;          // grows through the mid band
+    return Math.min(base*(1-loss),1858); // rated capped low
+  }
+
+  var pts=new Array(N), latent=0;
+  for(var i=0;i<N;i++){
+    latent=0.94*latent+Math.sqrt(1-0.94*0.94)*gauss();
+    var u=Math.min(0.9995,Math.max(0.0005,normCdf(latent)));
+    var ws=C*Math.pow(-Math.log(1-u),1/K);
+    pts[i]={t:i,ws:ws,
+      p1:Math.max(0,refCurve(ws)+gauss()*52),
+      p2:Math.max(0,degCurve(ws)+gauss()*52)};
+  }
+
+  // AEP gap, weighted by the Weibull resource
+  var e1=0,e2=0;
+  for(var w=0.1;w<=CUTOUT;w+=0.1){
+    var pdf=(K/C)*Math.pow(w/C,K-1)*Math.exp(-Math.pow(w/C,K));
+    e1+=refCurve(w)*pdf*0.1; e2+=degCurve(w)*pdf*0.1;
+  }
+  var GAP=((e1-e2)/e1*100);
+  var GAPTXT='\u2212'+GAP.toFixed(1)+'% AEP';
+
+  /* ---------- canvas ---------- */
+  var cv=document.getElementById('hero'), ctx=cv.getContext('2d'), W=0,H=0,DPR=1;
+  var PAD={l:54,r:16,t:18,b:36};
+  function size(){
+    DPR=Math.min(window.devicePixelRatio||1,2);
+    var r=cv.getBoundingClientRect();
+    W=r.width;H=r.height;
+    cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  function css(v){return getComputedStyle(root).getPropertyValue(v).trim();}
+  function pw(){return W-PAD.l-PAD.r;} function ph(){return H-PAD.t-PAD.b;}
+
+  var MAXWS=28, MAXP=2250;
+  function ax(ws){return PAD.l+(ws/MAXWS)*pw();}
+  function ay(p){return PAD.t+ph()-(p/MAXP)*ph();}
+  function posA(d){return{x:PAD.l+(d.t/(N-1))*pw(), y:PAD.t+ph()-(d.ws/MAXWS)*ph()};}
+  function ease(t){return t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;}
+  function small(){return W<560;}
+
+  function axes(morph){
+    var steel=css('--steel'), line=css('--steel-line');
+    ctx.strokeStyle=line;ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(PAD.l,PAD.t);ctx.lineTo(PAD.l,PAD.t+ph());ctx.lineTo(PAD.l+pw(),PAD.t+ph());
+    ctx.stroke();
+    ctx.fillStyle=steel;ctx.font='11px Archivo, system-ui, sans-serif';
+
+    ctx.save();ctx.globalAlpha=1-morph;ctx.textAlign='right';
+    for(var s=0;s<=25;s+=5){ctx.fillText(s+'',PAD.l-9,PAD.t+ph()-(s/MAXWS)*ph()+4);}
+    ctx.fillText('m/s',PAD.l-9,PAD.t-4);
+    ctx.restore();
+
+    ctx.save();ctx.globalAlpha=morph;ctx.textAlign='right';
+    for(var p=0;p<=2000;p+=500){ctx.fillText(p+'',PAD.l-9,ay(p)+4);}
+    ctx.fillText('kW',PAD.l-9,PAD.t-4);
+    ctx.restore();
+
+    ctx.textAlign='left';
+    ctx.save();ctx.globalAlpha=1-morph;ctx.fillText('time \u2014 10-minute intervals',PAD.l,H-8);ctx.restore();
+    ctx.save();ctx.globalAlpha=morph;
+    ctx.fillText('wind speed \u2014 m/s',PAD.l,H-8);
+    for(var w2=5;w2<=25;w2+=5){ctx.fillText(w2+'',ax(w2)-4,PAD.t+ph()+16);}
+    ctx.restore();
+  }
+
+  function curveLine(fn,alpha,colour,width,prog){
+    ctx.save();ctx.globalAlpha=alpha;ctx.strokeStyle=colour;ctx.lineWidth=width;ctx.lineJoin='round';
+    ctx.beginPath();
+    var steps=200, drawn=Math.floor(prog*steps);
+    for(var k=0;k<=drawn;k++){var ws=(k/steps)*MAXWS;k?ctx.lineTo(ax(ws),ay(fn(ws))):ctx.moveTo(ax(ws),ay(fn(ws)));}
+    ctx.stroke();ctx.restore();
+  }
+
+  var lastT=0;
+  function draw(t){
+    lastT=t;
+    ctx.clearRect(0,0,W,H);
+    var ink=css('--anthracite'), sig=css('--signal'), steel=css('--steel');
+
+    var drawEnd=2.2, morphStart=2.7, morphEnd=5.2, curveStart=4.5, curveEnd=6.0, annStart=6.0, annEnd=6.8;
+    var reveal=Math.min(1,t/drawEnd);
+    var morph=t<=morphStart?0:Math.min(1,(t-morphStart)/(morphEnd-morphStart));
+    var mE=ease(morph);
+    var cShow=t<=curveStart?0:Math.min(1,(t-curveStart)/(curveEnd-curveStart));
+    var aShow=t<=annStart?0:Math.min(1,(t-annStart)/(annEnd-annStart));
+
+    axes(mE);
+    var upTo=Math.floor(reveal*(N-1));
+
+    // shaded energy gap between the two curves
+    if(cShow>0.55){
+      ctx.save();
+      ctx.globalAlpha=(cShow-0.55)/0.45*0.13;
+      ctx.fillStyle=sig;
+      ctx.beginPath();
+      for(var g=0;g<=200;g++){var ws=(g/200)*MAXWS;g?ctx.lineTo(ax(ws),ay(refCurve(ws))):ctx.moveTo(ax(ws),ay(refCurve(ws)));}
+      for(var g2=200;g2>=0;g2--){var ws2=(g2/200)*MAXWS;ctx.lineTo(ax(ws2),ay(degCurve(ws2)));}
+      ctx.closePath();ctx.fill();
+      ctx.restore();
+    }
+
+    // phase 1 strip chart, dissolving into the morph
+    if(mE<1){
+      ctx.save();ctx.globalAlpha=(1-mE)*0.85;ctx.strokeStyle=ink;ctx.lineWidth=1;ctx.lineJoin='round';
+      ctx.beginPath();
+      for(var i=0;i<=upTo;i++){
+        var d=pts[i],a=posA(d);
+        var x=a.x+(ax(d.ws)-a.x)*mE, y=a.y+(ay(d.p1)-a.y)*mE;
+        i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+      }
+      ctx.stroke();ctx.restore();
+    }
+
+    // one signal splits into two populations
+    if(mE>0){
+      for(var j=0;j<=upTo;j++){
+        var dd=pts[j],aa=posA(dd);
+        ctx.globalAlpha=mE*0.34;ctx.fillStyle=ink;
+        ctx.beginPath();ctx.arc(aa.x+(ax(dd.ws)-aa.x)*mE, aa.y+(ay(dd.p1)-aa.y)*mE,1.5,0,6.2832);ctx.fill();
+        ctx.globalAlpha=mE*0.34;ctx.fillStyle=sig;
+        ctx.beginPath();ctx.arc(aa.x+(ax(dd.ws)-aa.x)*mE, aa.y+(ay(dd.p2)-aa.y)*mE,1.5,0,6.2832);ctx.fill();
+      }
+      ctx.globalAlpha=1;
+    }
+
+    if(cShow>0){
+      curveLine(refCurve,1,ink,1.6,cShow);
+      curveLine(degCurve,1,sig,2,cShow);
+    }
+
+    if(aShow>0){
+      ctx.save();ctx.globalAlpha=aShow;
+      ctx.font='12px Archivo, system-ui, sans-serif';ctx.textAlign='left';
+      ctx.fillStyle=ink;  ctx.fillText('T01 \u2014 reference', ax(15.4), ay(RATED)-14);
+      ctx.fillStyle=sig;  ctx.fillText('T07 \u2014 measured',  ax(15.4), ay(1858)+20);
+      if(!small()){
+        var gx=ax(11), gTop=ay(refCurve(11)), gBot=ay(degCurve(11));
+        ctx.strokeStyle=sig;ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(gx,gTop);ctx.lineTo(gx,gBot);
+        ctx.moveTo(gx-4,gTop);ctx.lineTo(gx+4,gTop);
+        ctx.moveTo(gx-4,gBot);ctx.lineTo(gx+4,gBot);
+        ctx.stroke();
+        ctx.fillStyle=sig;ctx.textAlign='right';
+        ctx.font='600 13px Archivo, system-ui, sans-serif';
+        ctx.fillText(GAPTXT,gx-10,(gTop+gBot)/2+4);
+        ctx.font='11px Archivo, system-ui, sans-serif';ctx.fillStyle=steel;
+        ctx.fillText('deviation begins ~8 m/s',gx-10,(gTop+gBot)/2+20);
+      }
+      ctx.restore();
+    }
+  }
+
+  /* ---------- run ---------- */
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var note=document.getElementById('plotNote');
+  var revealEls=[document.getElementById('h1'),document.getElementById('lede'),document.getElementById('actions')];
+
+  size();
+  window.addEventListener('resize',function(){size();draw(lastT);});
+
+  if(reduce){
+    draw(7.2);
+    setShift(1);
+    revealEls.forEach(function(el){el.classList.add('in');});
+    note.textContent='Same wind, two turbines \u00b7 synthetic sample \u00b7 motion reduced';
+  }else{
+    var start=null, DUR=7.0;
+    runShift();
+    revealEls.forEach(function(el,i){setTimeout(function(){el.classList.add('in');},700+i*130);});
+    (function step(ts){
+      if(start===null)start=ts;
+      var t=(ts-start)/1000;
+      draw(Math.min(t,DUR));
+      if(t<DUR)requestAnimationFrame(step);
+    })(performance.now());
+  }
+})();
+</script>
+</body>
+</html>
