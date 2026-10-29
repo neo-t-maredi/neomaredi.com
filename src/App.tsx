@@ -74,13 +74,13 @@ export default function App() {
                   <span className="project-name">windforge</span>
                   <span className="status live">Live</span>
                 </div>
-                <p className="project-desc">Wind site feasibility tool. Pulls Global Wind Atlas GeoTIFF rasters, fits a Weibull distribution to the resource, and returns annual energy production to IEC 61400-12-1 with a CRF-based levelised cost of energy and jurisdiction flags.</p>
+                <p className="project-desc">Wind site feasibility tool. Pulls Global Wind Atlas GeoTIFF rasters, models wind-speed variation with an assumed Weibull distribution, and estimates annual energy production and levelised cost using a synthetic turbine curve and explicit financial assumptions.</p>
                 <div className="metrics">
-                  <div className="metric"><b>IEC 61400-12-1</b><span>AEP methodology</span></div>
-                  <div className="metric"><b>Weibull</b><span>resource fitting</span></div>
+                  <div className="metric"><b>Modelled</b><span>AEP estimate</span></div>
+                  <div className="metric"><b>Weibull</b><span>assumed distribution</span></div>
                   <div className="metric"><b>CRF</b><span>LCOE model</span></div>
                 </div>
-                <p className="stack">FastAPI &middot; React &middot; rasterio &middot; Docker &middot; structured logging &middot; rate limiting</p>
+                <p className="stack">FastAPI &middot; React &middot; rasterio &middot; SciPy</p>
                 <span className="repo">github.com/neo-t-maredi/windforge</span>
                 <img className="shot" src="/images/windforge.png" alt="windforge feasibility report" width={1200} height={750} loading="lazy" />
               </a>
@@ -133,7 +133,7 @@ export default function App() {
               <div className="cred">
                 <h3>Ignition Core Certification</h3>
                 <p>Inductive Automation</p>
-                <span className="flag">Scheduled Oct 2026</span>
+                <span className="flag">Planned, not yet completed</span>
               </div>
               <div className="cred">
                 <h3>IRATA Level 1</h3>
@@ -149,7 +149,7 @@ export default function App() {
             <div className="contact-links">
               <a href="#" id="mail">Email</a>
               <a href="https://github.com/neo-t-maredi">GitHub</a>
-              <a href="#">LinkedIn</a>
+              
             </div>
             <p className="availability">Based in the Eastern Province, Saudi Arabia. Open to wind O&amp;M and asset performance roles across MENA and Europe.</p>
           </section>
@@ -158,7 +158,7 @@ export default function App() {
         <div className="wrap">
           <footer>
             <span className="footer-id"><Turbine />Neo T. Maredi &mdash; industrial automation, wind O&amp;M digital operations</span>
-            <span>Hero data is a synthetic sample. Production build uses the Kelmarsh open dataset.</span>
+            <span>Hero data is a synthetic sample. This chart is modelled and does not use Kelmarsh measurements.</span>
           </footer>
         </div>
       </main>
