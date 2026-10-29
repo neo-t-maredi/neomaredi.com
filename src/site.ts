@@ -54,7 +54,7 @@ function refCurve(ws: number): number {
 }
 
 // T07: tracks reference until ~8 m/s, then falls away and reaches rated late and low.
-// Signature of pitch misalignment or blade degradation, not a fault SCADA alarms on.
+// Illustrative degraded curve, not a diagnosed fault or measured turbine record.
 function degCurve(ws: number): number {
   const base = refCurve(ws)
   if (base <= 0) return 0
