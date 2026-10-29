@@ -60,7 +60,7 @@ export default function App() {
                 <p>Wind turbines and gas turbines produce the same class of operational data: tag-level telemetry at fixed intervals, alarm streams requiring rationalisation, and vibration signatures that indicate degradation ahead of any drop in output.</p>
                 <p>My background is that work in oil and gas &mdash; SCADA historians, DCS logic, alarm management, and rotating equipment condition monitoring. Currently contracted to <strong>T&Uuml;V Rheinland</strong> in Saudi Arabia's Eastern Province.</p>
                 <p>What carries over directly: data quality assessment on production historians, alarm rationalisation, condition-based maintenance planning, and reconciling reported availability against source records.</p>
-                <p>Wind-specific work is deliberate and current. <strong>GWO certified</strong>. IEC 61400 methods implemented in code rather than referenced in slides. Tooling built and tested against real turbine datasets.</p>
+                <p>Wind-specific work is deliberate and current. <strong>GWO certified</strong>. My published tools include wind-resource screening models and SCADA data processing. Each repository records its data sources and model limitations.</p>
               </div>
             </div>
           </section>
@@ -72,7 +72,7 @@ export default function App() {
               <a className="project lead" href="https://github.com/neo-t-maredi/windforge">
                 <div className="project-head">
                   <span className="project-name">windforge</span>
-                  <span className="status live">Live</span>
+                  <span className="status">Source available</span>
                 </div>
                 <p className="project-desc">Wind site feasibility tool. Pulls Global Wind Atlas GeoTIFF rasters, models wind-speed variation with an assumed Weibull distribution, and estimates annual energy production and levelised cost using a synthetic turbine curve and explicit financial assumptions.</p>
                 <div className="metrics">
@@ -82,17 +82,17 @@ export default function App() {
                 </div>
                 <p className="stack">FastAPI &middot; React &middot; rasterio &middot; SciPy</p>
                 <span className="repo">github.com/neo-t-maredi/windforge</span>
-                <img className="shot" src="/images/windforge.png" alt="windforge feasibility report" width={1200} height={750} loading="lazy" />
+                
               </a>
 
-              <a className="project" href="#work">
+              <a className="project" href="https://github.com/neo-t-maredi/scada-norm">
                 <div className="project-head">
                   <span className="project-name">scada-norm</span>
-                  <span className="status live">Live</span>
+                  <span className="status">Source available</span>
                 </div>
                 <p className="project-desc">Rust CLI that normalises Kelmarsh wind farm SCADA exports into a canonical 11-column Parquet schema &mdash; designed against 299 real CSV columns, so it survives contact with actual vendor exports.</p>
                 <div className="metrics">
-                  <div className="metric"><b>52,704</b><span>rows normalised</span></div>
+                  <div className="metric"><b>52,704</b><span>rows in a recorded batch</span></div>
                   <div className="metric"><b>78 MB &#8594; 3.9 MB</b><span>Snappy compression</span></div>
                   <div className="metric"><b>0</b><span>parse failures</span></div>
                 </div>
@@ -100,7 +100,7 @@ export default function App() {
                 <span className="repo">Repository</span>
               </a>
 
-              <a className="project" href="#work">
+              <a className="project" href="https://github.com/neo-t-maredi/SharqNet.v1">
                 <div className="project-head">
                   <span className="project-name">sharqnet</span>
                   <span className="status">In progress</span>
