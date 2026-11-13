@@ -1,4 +1,4 @@
-import { readFile, readdir, mkdir, writeFile, cp } from 'node:fs/promises'
+import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 
@@ -21,8 +21,7 @@ worker = worker.replace('const staticAssets = {};', `const staticAssets = ${JSON
 await mkdir('dist/server', { recursive: true })
 await mkdir('dist/.openai', { recursive: true })
 await writeFile('dist/server/index.js', worker)
-await cp('.openai/hosting.json', 'dist/.openai/hosting.json')
-await cp('drizzle', 'dist/.openai/drizzle', { recursive: true })
+
 const module = await import(`../dist/server/index.js?check=${Date.now()}`)
 if (typeof module.default?.fetch !== 'function') throw new Error('Missing Worker fetch entrypoint')
 console.log(`Built writing Worker with ${Object.keys(assets).length} portfolio assets.`)
