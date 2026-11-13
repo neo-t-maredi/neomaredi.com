@@ -1,0 +1,49 @@
+[
+  {
+    "name": "johns-hopkins.png",
+    "url": "https://coursera-university-assets.s3.amazonaws.com/38/8b04d939454911a61057268c51194b/JHU.logo_rgb.horizontal.blue.png",
+    "page": "https://www.coursera.org/specializations/information-assurance-analysis",
+    "bytes": 3510,
+    "dimensions": [
+      158,
+      48
+    ]
+  },
+  {
+    "name": "duke.png",
+    "url": "https://coursera-university-assets.s3.amazonaws.com/8c/3fea3c61b899a0e79075dc8c96195d/dukewidelogo2.png",
+    "page": "https://www.coursera.org/learn/electricity",
+    "bytes": 2229,
+    "dimensions": [
+      200,
+      48
+    ]
+  },
+  {
+    "name": "suny.png",
+    "url": "https://coursera-university-assets.s3.amazonaws.com/e0/31a3853a284a86baa3219a8207a66f/SUNY_NEW_LOGO_Gotham_horizontal.png",
+    "page": "https://www.coursera.org/specializations/energy-industry/",
+    "bytes": 3008,
+    "dimensions": [
+      111,
+      48
+    ]
+  },
+  {
+    "name": "lnt-edutech.png",
+    "url": "https://coursera-university-assets.s3.amazonaws.com/e2/c8cb83a8ae441f8cc0ff5aeb7c8980/EduTech-Master-logo-2021-dimensions.png",
+    "page": "https://www.coursera.org/specializations/petroleum-engineering-with-ai-applications",
+    "bytes": 3123,
+    "dimensions": [
+      120,
+      48
+    ]
+  },
+  {
+    "name": "google.svg",
+    "url": "https://www.gstatic.com/marketing-cms/assets/images/54/05/26ace8084f80a29779bf8bea59e0/google-logo-footer.svg",
+    "page": "https://grow.google/certificates/cybersecurity/",
+    "bytes": 3171,
+    "dimensions": null
+  }
+]

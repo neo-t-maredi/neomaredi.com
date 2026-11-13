@@ -1,0 +1,48 @@
+{
+  "windforge.webp": {
+    "repository": "https://github.com/neo-t-maredi/windforge",
+    "source": "https://github.com/neo-t-maredi/windforge/blob/main/docs/images/windforge-dark.png",
+    "sourceGitBlobSha": "4a8056139b3b184004f046caf435eb7fe6e55dd8",
+    "description": "Original dark dashboard screenshot, converted to WebP for delivery"
+  },
+  "scada-norm.webp": {
+    "repository": "https://github.com/neo-t-maredi/scada-norm",
+    "source": "https://github.com/neo-t-maredi/scada-norm/blob/main/docs/images/scada-norm-validation.png",
+    "sourceGitBlobSha": "94df03b887d87aaf1b2fa984a296f9c9077122e2",
+    "description": "Original full-year readback screenshot, converted to WebP for delivery"
+  },
+  "sharqnet.webp": {
+    "repository": "https://github.com/neo-t-maredi/SharqNet.v1",
+    "source": "https://github.com/neo-t-maredi/SharqNet.v1/blob/main/docs/screenshots/operations-desktop.png",
+    "sourceGitBlobSha": "0dd6c9004b078e1e75b2abd4e97969dbf06ffce8",
+    "description": "Original operations screenshot with simulated meters, converted to WebP for delivery"
+  },
+  "stratum.webp": {
+    "repository": "https://github.com/neo-t-maredi/Stratum-protocal-ETH",
+    "source": "https://github.com/neo-t-maredi/Stratum-protocal-ETH/blob/main/docs/screenshots/workbench-base.png",
+    "sourceGitBlobSha": "83981a02eefc82a5e04dd7da0e26f05f85d5f066",
+    "description": "Actual local collateral workbench capture, converted to WebP; illustrative scenario, writes disabled"
+  },
+  "homeinv.webp": {
+    "repository": "https://github.com/neo-t-maredi/HomeInv-Protocol",
+    "source": "https://github.com/neo-t-maredi/HomeInv-Protocol/blob/main/docs/screenshots/rent-ledger.png",
+    "sourceGitBlobSha": "21ec2d25fcdbd1975f57810057ec1dbba418cbf2",
+    "description": "Actual local rent ledger capture, converted to WebP; illustrative accounting model"
+  },
+  "bernie.webp": {
+    "repository": "https://github.com/neo-t-maredi/bernie",
+    "source": "Author-supplied Android emulator screenshot, 7 October 2026",
+    "description": "Original emulator pixels preserved in lossless WebP; synthetic SMS demo fixtures; active-development MVP"
+  },
+  "dumat-deployment.webp": {
+    "repository": "https://github.com/neo-t-maredi/RWA-stablecoins",
+    "source": "Author-supplied Sepolia deployment screenshot, 5 October 2026",
+    "description": "Original terminal pixels cropped from the supplied editor screenshot and stored losslessly; historical testnet deployment, not a new run",
+    "cropBox": [
+      12,
+      825,
+      1250,
+      1040
+    ]
+  }
+}

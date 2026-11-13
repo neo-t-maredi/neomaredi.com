@@ -43,8 +43,9 @@ const RATEDWS = 13
 const CUTOUT = 25
 const MAXWS = 28
 const MAXP = 2250
+const CURVE_STEPS = 200
 
-// Reference machine, as warranted.
+// Reference curve for the synthetic machine.
 function refCurve(ws: number): number {
   if (ws < CUTIN || ws > CUTOUT) return 0
   if (ws >= RATEDWS) return RATED
@@ -53,8 +54,8 @@ function refCurve(ws: number): number {
   return RATED * (a / b)
 }
 
-// T07: tracks reference until ~8 m/s, then falls away and reaches rated late and low.
-// Signature of pitch misalignment or blade degradation, not a fault SCADA alarms on.
+// T07: tracks reference until ~8 m/s, then falls away to a lower plateau.
+// Illustrates the kind of underperformance a power-curve comparison can reveal.
 function degCurve(ws: number): number {
   const base = refCurve(ws)
   if (base <= 0) return 0
@@ -111,12 +112,13 @@ export function initSite(): () => void {
   } catch {
     stored = null
   }
-  const initial = stored ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+  const initial = (stored === 'light' || stored === 'dark' ? stored : null) ?? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
 
   const applyTheme = (t: string) => {
     root.setAttribute('data-theme', t)
     tog.textContent = t === 'dark' ? 'Light' : 'Dark'
     tog.setAttribute('aria-label', 'Switch to ' + (t === 'dark' ? 'light' : 'dark') + ' theme')
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t === 'dark' ? '#181a1a' : '#e6e6e2')
   }
   applyTheme(initial)
 
@@ -127,55 +129,141 @@ export function initSite(): () => void {
   mail.href = 'mailto:' + user + '@' + dom
   mail.textContent = user + '@' + dom
 
-  /* ---------- shift bar ---------- */
+  /* ---------- pivot gate and page controls ---------- */
+  const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
+  const content = byId('siteContent')
+  const gate = byId('pivotGate')
+  const progress = byId('shiftProgress')
   const fillEl = byId('shiftFill')
   const pctEl = byId('shiftPct')
   const stageEls = Array.from(document.querySelectorAll<HTMLLIElement>('#shiftStages li'))
+  const note = byId('plotNote')
+  const topButton = byId<HTMLButtonElement>('backToTop')
+  const heroSection = document.querySelector<HTMLElement>('.hero')!
+  const revealEls = [byId('h1'), byId('lede'), byId('actions')]
+  let completed = false
+  let disposed = false
+  let redrawHero = () => {}
+  let finishHero = () => {}
 
   const setShift = (f: number) => {
     fillEl.style.width = (f * 100).toFixed(2) + '%'
-    pctEl.textContent = Math.round(f * 100) + '%'
-    stageEls.forEach((el, i) => {
-      el.classList.toggle('on', f >= (i + 1) / stageEls.length - 0.08)
-    })
+    const percent = f >= 1 ? 100 : Math.floor(f * 100)
+    pctEl.textContent = percent + '%'
+    progress.setAttribute('aria-valuenow', String(percent))
+    stageEls.forEach((el, i) => el.classList.toggle('on', f >= (i + 1) / stageEls.length))
   }
 
-  const runShift = () => {
-    const DURS = 2600
-    const DELAY = 900
-    timers.push(
-      window.setTimeout(() => {
-        let t0: number | null = null
-        const s = (ts: number) => {
-          if (t0 === null) t0 = ts
-          const p = Math.min(1, (ts - t0) / DURS)
-          setShift(p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2)
-          if (p < 1) rafShift = requestAnimationFrame(s)
-        }
-        s(performance.now())
-      }, DELAY),
-    )
+  const updateTopButton = () => {
+    topButton.hidden = !completed || heroSection.getBoundingClientRect().bottom > 0
   }
+  const onTop = () => {
+    byId('h1').focus({ preventScroll: true })
+    window.scrollTo({ top: 0, behavior: motion.matches ? 'instant' : 'smooth' })
+  }
+  const onToggle = () => {
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'
+    applyTheme(next)
+    try { localStorage.setItem('theme', next) } catch { /* storage unavailable */ }
+    redrawHero()
+  }
+  const onSystemTheme = () => {
+    let preferred: string | null = null
+    try { preferred = localStorage.getItem('theme') } catch { /* storage unavailable */ }
+    if (preferred !== 'light' && preferred !== 'dark') {
+      applyTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      redrawHero()
+    }
+  }
+  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
+  tog.addEventListener('click', onToggle)
+  topButton.addEventListener('click', onTop)
+  window.addEventListener('scroll', updateTopButton, { passive: true })
+  systemTheme.addEventListener('change', onSystemTheme)
 
-  /* ---------- section rules ---------- */
   const secs = Array.from(document.querySelectorAll('section'))
-  const io = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((e) => {
-        if (e.isIntersecting) {
-          e.target.classList.add('seen')
-          io.unobserve(e.target)
-        }
-      })
-    },
-    { rootMargin: '0px 0px -12% 0px' },
-  )
-  secs.forEach((s) => io.observe(s))
+  const io = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (e.isIntersecting) {
+        e.target.classList.add('seen')
+        io?.unobserve(e.target)
+      }
+    })
+  }, { rootMargin: '0px 0px -12% 0px' }) : null
+  if (io) secs.forEach((section) => io.observe(section))
+  else secs.forEach((section) => section.classList.add('seen'))
+
+  const runShift = (startHero: () => void) => {
+    root.dataset.pivot = 'loading'
+    content.inert = true
+    content.setAttribute('aria-busy', 'true')
+    setShift(0)
+    const finish = () => {
+      if (completed || disposed) return
+      completed = true
+      cancelAnimationFrame(rafShift)
+      setShift(1)
+      byId('gateStatus').textContent = 'Pivot complete.'
+      root.dataset.pivot = 'complete'
+      content.inert = false
+      content.setAttribute('aria-busy', 'false')
+      gate.setAttribute('aria-hidden', 'true')
+      revealEls.forEach((el) => el.classList.add('in'))
+      updateTopButton()
+      timers.push(window.setTimeout(() => { if (!disposed) startHero() }, motion.matches ? 0 : 220))
+    }
+    finishHero = () => { finish(); cancelAnimationFrame(rafHero); redrawHero() }
+    if (motion.matches) { finish(); return }
+    let start: number | null = null
+    const step = (ts: number) => {
+      if (disposed || completed) return
+      if (root.dataset.pivot === 'complete') { finish(); return }
+      if (start === null) start = ts
+      const p = Math.min(1, (ts - start) / 2200)
+      setShift(p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2)
+      if (p < 1) rafShift = requestAnimationFrame(step)
+      else timers.push(window.setTimeout(finish, 160))
+    }
+    rafShift = requestAnimationFrame(step)
+    // Background tabs may suspend RAF; a missed callback must never lock the site.
+    timers.push(window.setTimeout(finish, 5000))
+  }
+  const onMotion = () => { if (motion.matches) finishHero() }
+  motion.addEventListener('change', onMotion)
+  const cleanupCommon = () => {
+    disposed = true
+    cancelAnimationFrame(rafHero)
+    cancelAnimationFrame(rafShift)
+    timers.forEach((id) => clearTimeout(id))
+    io?.disconnect()
+    tog.removeEventListener('click', onToggle)
+    topButton.removeEventListener('click', onTop)
+    window.removeEventListener('scroll', updateTopButton)
+    systemTheme.removeEventListener('change', onSystemTheme)
+    motion.removeEventListener('change', onMotion)
+  }
 
   /* ---------- canvas ---------- */
+  const windControl = document.getElementById('windSpeed') as HTMLInputElement | null
+  const replayControl = document.getElementById('replayHero')
+  let selectedWind: number | null = null
+  const updateReadouts = () => {
+    const wind = Number(windControl?.value || 11)
+    const reference = refCurve(wind), degraded = degCurve(wind)
+    const values: Record<string, string> = { windValue: wind.toFixed(1) + ' m/s', powerRef: Math.round(reference).toLocaleString('en-GB') + ' kW', powerDeg: Math.round(degraded).toLocaleString('en-GB') + ' kW', powerGap: Math.round(reference - degraded).toLocaleString('en-GB') + ' kW' }
+    for (const [id, value] of Object.entries(values)) { const el = document.getElementById(id); if (el) el.textContent = value }
+    windControl?.setAttribute('aria-valuetext', `${wind.toFixed(1)} metres per second; reference ${Math.round(reference)} kilowatts; degraded ${Math.round(degraded)} kilowatts; gap ${Math.round(reference - degraded)} kilowatts`)
+  }
+  updateReadouts()
   const cv = byId<HTMLCanvasElement>('hero')
   const ctxMaybe = cv.getContext('2d')
-  if (!ctxMaybe) throw new Error('2D canvas context unavailable')
+  if (!ctxMaybe) {
+    cv.hidden = true
+    note.textContent = 'Synthetic comparison: T07 underperforms T01 above about 8 m/s.'
+    note.classList.add('canvas-fallback')
+    runShift(() => {})
+    return cleanupCommon
+  }
   const ctx: CanvasRenderingContext2D = ctxMaybe
 
   let W = 0
@@ -230,11 +318,11 @@ export function initSite(): () => void {
     ctx.textAlign = 'left'
     ctx.save()
     ctx.globalAlpha = 1 - morph
-    ctx.fillText('time \u2014 10-minute intervals', PAD.l, H - 8)
+    ctx.fillText('Time (10-minute intervals)', PAD.l, H - 8)
     ctx.restore()
     ctx.save()
     ctx.globalAlpha = morph
-    ctx.fillText('wind speed \u2014 m/s', PAD.l, H - 8)
+    ctx.fillText('Wind speed (m/s)', PAD.l, H - 8)
     for (let w2 = 5; w2 <= 25; w2 += 5) ctx.fillText(String(w2), ax(w2) - 4, PAD.t + ph() + 16)
     ctx.restore()
   }
@@ -246,10 +334,9 @@ export function initSite(): () => void {
     ctx.lineWidth = width
     ctx.lineJoin = 'round'
     ctx.beginPath()
-    const steps = 200
-    const drawn = Math.floor(prog * steps)
+    const drawn = Math.floor(prog * CURVE_STEPS)
     for (let k = 0; k <= drawn; k++) {
-      const ws = (k / steps) * MAXWS
+      const ws = (k / CURVE_STEPS) * CUTOUT
       if (k) ctx.lineTo(ax(ws), ay(fn(ws)))
       else ctx.moveTo(ax(ws), ay(fn(ws)))
     }
@@ -287,13 +374,14 @@ export function initSite(): () => void {
       ctx.globalAlpha = ((cShow - 0.55) / 0.45) * 0.13
       ctx.fillStyle = sig
       ctx.beginPath()
-      for (let g = 0; g <= 200; g++) {
-        const ws = (g / 200) * MAXWS
+      const drawn = Math.floor(cShow * CURVE_STEPS)
+      for (let g = 0; g <= drawn; g++) {
+        const ws = (g / CURVE_STEPS) * CUTOUT
         if (g) ctx.lineTo(ax(ws), ay(refCurve(ws)))
         else ctx.moveTo(ax(ws), ay(refCurve(ws)))
       }
-      for (let g2 = 200; g2 >= 0; g2--) {
-        const ws2 = (g2 / 200) * MAXWS
+      for (let g2 = drawn; g2 >= 0; g2--) {
+        const ws2 = (g2 / CURVE_STEPS) * CUTOUT
         ctx.lineTo(ax(ws2), ay(degCurve(ws2)))
       }
       ctx.closePath()
@@ -351,9 +439,10 @@ export function initSite(): () => void {
       ctx.font = '12px Archivo, system-ui, sans-serif'
       ctx.textAlign = 'left'
       ctx.fillStyle = ink
-      ctx.fillText('T01 \u2014 reference', ax(15.4), ay(RATED) - 14)
+      ctx.font = (small() ? '10px' : '12px') + ' Archivo, system-ui, sans-serif'
+      ctx.fillText('T01 reference', ax(small() ? 14.4 : 15.4), ay(RATED) - 14)
       ctx.fillStyle = sig
-      ctx.fillText('T07 \u2014 measured', ax(15.4), ay(1858) + 20)
+      ctx.fillText(small() ? 'T07 degraded' : 'T07 underperforming', ax(small() ? 14.4 : 15.4), ay(degCurve(15.4)) + 20)
       if (!small()) {
         const gx = ax(11)
         const gTop = ay(refCurve(11))
@@ -378,60 +467,52 @@ export function initSite(): () => void {
       }
       ctx.restore()
     }
-  }
-
-  /* ---------- listeners ---------- */
-  const onToggle = () => {
-    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'
-    applyTheme(next)
-    try {
-      localStorage.setItem('theme', next)
-    } catch {
-      /* storage unavailable */
+    if (selectedWind !== null) {
+      const x = ax(selectedWind)
+      ctx.strokeStyle = css('--steel-line'); ctx.lineWidth = 1
+      ctx.beginPath(); ctx.moveTo(x, PAD.t); ctx.lineTo(x, H - PAD.b); ctx.stroke()
+      for (const [p, colour] of [[refCurve(selectedWind), ink], [degCurve(selectedWind), sig]] as [number, string][]) {
+        ctx.fillStyle = colour; ctx.beginPath(); ctx.arc(x, ay(p), 4, 0, Math.PI * 2); ctx.fill()
+      }
     }
-    draw(lastT)
   }
-  const onResize = () => {
-    size()
-    draw(lastT)
-  }
-  tog.addEventListener('click', onToggle)
-  window.addEventListener('resize', onResize)
 
-  /* ---------- run ---------- */
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const note = byId('plotNote')
-  const revealEls = [byId('h1'), byId('lede'), byId('actions')]
-
+  /* ---------- listeners and preserved hero animation ---------- */
+  redrawHero = () => draw(motion.matches ? 7.2 : lastT)
+  const onResize = () => { size(); redrawHero(); updateTopButton() }
+  window.addEventListener('resize', onResize, { passive: true })
   size()
-
-  if (reduce) {
-    draw(7.2)
-    setShift(1)
-    revealEls.forEach((el) => el.classList.add('in'))
-    note.textContent = 'Same wind, two turbines \u00b7 synthetic sample \u00b7 motion reduced'
-  } else {
-    const DUR = 7.0
-    runShift()
-    revealEls.forEach((el, i) => {
-      timers.push(window.setTimeout(() => el.classList.add('in'), 700 + i * 130))
-    })
+  const animate = () => {
+    cancelAnimationFrame(rafHero)
+    selectedWind = null
+    size()
+    if (motion.matches) { draw(7.2); note.textContent = 'Same wind, two turbines · synthetic model · motion reduced'; return }
+    note.textContent = 'Telemetry → power curves → degradation gap'
     let start: number | null = null
     const step = (ts: number) => {
+      if (disposed) return
+      if (motion.matches) { draw(7.2); return }
       if (start === null) start = ts
       const t = (ts - start) / 1000
-      draw(Math.min(t, DUR))
-      if (t < DUR) rafHero = requestAnimationFrame(step)
+      draw(Math.min(t, 7.2))
+      if (t < 7.2) rafHero = requestAnimationFrame(step)
+      else note.textContent = 'Synthetic resource-weighted gap: ' + GAPTXT
     }
-    step(performance.now())
+    rafHero = requestAnimationFrame(step)
   }
-
-  return () => {
+  const onWind = () => {
     cancelAnimationFrame(rafHero)
-    cancelAnimationFrame(rafShift)
-    timers.forEach((id) => clearTimeout(id))
-    io.disconnect()
-    tog.removeEventListener('click', onToggle)
+    selectedWind = Number(windControl?.value || 11)
+    updateReadouts(); draw(7.2)
+    note.textContent = 'Inspecting the model at ' + selectedWind.toFixed(1) + ' m/s · ' + GAPTXT
+  }
+  windControl?.addEventListener('input', onWind)
+  replayControl?.addEventListener('click', animate)
+  runShift(animate)
+  return () => {
+    cleanupCommon()
     window.removeEventListener('resize', onResize)
+    windControl?.removeEventListener('input', onWind)
+    replayControl?.removeEventListener('click', animate)
   }
 }
