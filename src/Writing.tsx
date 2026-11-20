@@ -8,11 +8,14 @@ type Draft = { id: string; title: string; excerpt: string; body: string; version
 type Action = 'draft' | 'publish' | 'unpublish'
 
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
+  const fallback = ['GET', 'HEAD'].includes((options?.method || 'GET').toUpperCase())
+    ? 'Writing is temporarily unavailable. Please try again.'
+    : 'Could not save your writing. Your edits are still here.'
   const response = await fetch(`/api/writing/${path}`, { credentials: 'same-origin', cache: 'no-store', ...options,
     headers: { 'content-type': 'application/json', ...options?.headers } })
   let result
-  try { result = await response.json() } catch { throw new Error('Writing is temporarily unavailable. Please try again.') }
-  if (!response.ok) throw new Error(result.error || 'Could not save your writing. Your edits are still here.')
+  try { result = await response.json() } catch { throw new Error(fallback) }
+  if (!response.ok) throw new Error(result?.error || fallback)
   return result
 }
 

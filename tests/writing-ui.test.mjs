@@ -140,3 +140,61 @@ test('owner editor lifecycle works; anonymous and signed-in visitors never see a
     rmSync(compiled, { force: true })
   }
 })
+
+test('public writing shows the static essay and keeps database failures visible without editor messaging', async t => {
+  const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'https://portfolio.test/' })
+  globalThis.window = dom.window; globalThis.document = dom.window.document
+  globalThis.HTMLElement = dom.window.HTMLElement
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true
+  const originalFetch = globalThis.fetch
+  t.mock.method(console, 'error', () => {})
+  let backend = 'static'
+  globalThis.fetch = async (path, options = {}) => {
+    if (backend === 'empty-error') return Response.json({}, { status: 503 })
+    return handleWritingRequest(new Request(new URL(path, 'https://portfolio.test'), options), backend === 'static' ? { WRITING_MODE: 'static' } : {})
+  }
+  mkdirSync(new URL('../node_modules/.tmp/', import.meta.url), { recursive: true })
+  const compiled = new URL('../node_modules/.tmp/writing-reader-ui.mjs', import.meta.url)
+  buildSync({ entryPoints: [new URL('../src/Writing.tsx', import.meta.url).pathname], outfile: compiled.pathname, bundle: true, platform: 'node', format: 'esm', jsx: 'automatic', external: ['react', 'react/jsx-runtime'] })
+  const { default: Writing } = await import(compiled.href)
+  const { createElement, act } = await import('react')
+  const { createRoot } = await import('react-dom/client')
+  const tick = () => new Promise(resolve => setImmediate(resolve))
+  let root
+  async function mount() {
+    await act(async () => {
+      root?.unmount()
+      root = createRoot(document.getElementById('root'))
+      root.render(createElement(Writing))
+      await tick()
+    })
+  }
+  const essay = () => document.querySelector('.writing-feature')?.getAttribute('href')
+  const retry = () => [...document.querySelectorAll('button')].find(el => el.textContent.trim() === 'Retry')
+  try {
+    await mount()
+    assert.equal(essay(), '/writing/energy-shock-2026.html')
+    assert.equal(document.querySelector('[role="alert"]'), null)
+    assert.equal(retry(), undefined)
+    assert.equal(document.querySelector('.writing-editor, .writing-drafts'), null)
+    assert.doesNotMatch(document.body.textContent, /Write a post|Loading writing/)
+
+    for (backend of ['database-error', 'empty-error']) {
+      await mount()
+      const alert = document.querySelector('[role="alert"]')
+      assert.ok(alert, `${backend} must remain visible`)
+      assert.match(alert.textContent, /Writing is temporarily unavailable\. Please try again\./)
+      assert.doesNotMatch(alert.textContent, /edits|save|draft/i)
+      assert.ok(retry(), 'Readers must be able to retry a failed feed request')
+      assert.equal(essay(), '/writing/energy-shock-2026.html')
+    }
+    backend = 'static'
+    await act(async () => { retry().click(); await tick() })
+    assert.equal(document.querySelector('[role="alert"]'), null)
+    assert.equal(essay(), '/writing/energy-shock-2026.html')
+  } finally {
+    await act(async () => root?.unmount())
+    globalThis.fetch = originalFetch; dom.window.close()
+    rmSync(compiled, { force: true })
+  }
+})

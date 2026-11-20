@@ -10,6 +10,7 @@ function json(data, status = 200) {
 }
 
 export function isOwner(request, env) {
+  if (env.WRITING_MODE === 'static') return false;
   const id = request.headers.get('oai-authenticated-user-id');
   const email = request.headers.get('oai-authenticated-user-email');
   return Boolean(id && email && env.BLOG_OWNER_EMAIL && email.toLowerCase() === env.BLOG_OWNER_EMAIL.toLowerCase());
@@ -164,6 +165,14 @@ export async function handleWritingRequest(request, env) {
   try {
     const url = new URL(request.url);
     const path = url.pathname;
+    // The public Cloudflare edition serves the essay bundled with the site.
+    // Only this explicit mode bypasses storage; database failures remain errors.
+    if (env.WRITING_MODE === 'static') {
+      if (path === '/api/writing/session' && request.method === 'GET') return json({ canEdit: false, mode: 'static' });
+      if (path === '/api/writing/posts' && request.method === 'GET') return json({ posts: [], mode: 'static' });
+      if (path === '/api/writing/drafts' || request.method !== 'GET') throw new HttpError(403, 'Writing is read-only on this site.');
+      throw new HttpError(404, 'This writing item is unavailable.');
+    }
     const media = path.match(/^\/api\/writing\/media\/([a-f0-9-]{36})(?:\/([a-f0-9-]{36}))?$/);
     if (media) return await handleMedia(request, env, media);
     if (path === '/api/writing/session' && request.method === 'GET') return json({ canEdit: isOwner(request, env) });
@@ -209,7 +218,10 @@ export async function handleWritingRequest(request, env) {
   } catch (error) {
     if (error instanceof HttpError) return json({ error: error.message }, error.status);
     console.error('Writing request failed', error);
-    return json({ error: 'Writing is temporarily unavailable. Your edits have not been cleared. Please try again.' }, 503);
+    const message = ['GET', 'HEAD'].includes(request.method)
+      ? 'Writing is temporarily unavailable. Please try again.'
+      : 'Writing is temporarily unavailable. Your edits have not been cleared. Please try again.';
+    return json({ error: message }, 503);
   }
 }
 

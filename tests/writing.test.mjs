@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { readFileSync, readdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { handleWritingRequest } from '../worker/index.js'
+import { handleWritingRequest, isOwner } from '../worker/index.js'
 
 const origin = 'https://portfolio.test'
 const id = 'd0c12ec2-5386-4337-a7c6-104113859b85'
@@ -41,6 +41,47 @@ test('owner-only editor and draft reads; cross-site writes rejected', async () =
     assert.equal((await request(env, 'posts', 'POST', initial, { ...owner, origin: 'https://another.test' })).status, 403)
     assert.equal((await request(env, 'posts', 'POST', initial, { ...owner, 'sec-fetch-site': 'cross-site' })).status, 403)
     assert.equal((await request({ ...env, BLOG_OWNER_EMAIL: undefined }, 'session', 'GET', null, owner)).canEdit, false)
+  } finally { sqlite.close() }
+})
+
+test('static writing serves the public feed and denies authoring without touching storage', async () => {
+  const storageAccesses = []
+  const env = {
+    WRITING_MODE: 'static', BLOG_OWNER_EMAIL: 'writer@example.test', BLOG_ORIGIN: origin,
+    get DB() { storageAccesses.push('DB'); throw new Error('Static writing must not access DB') },
+    get MEDIA() { storageAccesses.push('MEDIA'); throw new Error('Static writing must not access MEDIA') },
+  }
+  assert.equal(isOwner(new Request(origin, { headers: owner }), env), false)
+  assert.deepEqual(await request(env, 'session', 'GET', null, owner), { status: 200, canEdit: false, mode: 'static' })
+  assert.deepEqual(await request(env, 'posts'), { status: 200, posts: [], mode: 'static' })
+  for (const [path, method, body] of [
+    ['drafts', 'GET'], ['posts', 'POST', initial], [`posts/${id}`, 'PUT', initial],
+    [`media/${id}`, 'POST', {}], ['posts', 'DELETE'], ['posts', 'OPTIONS'], ['posts', 'HEAD'],
+  ]) {
+    assert.equal((await request(env, path, method, body, owner)).status, 403, `${method} ${path} must remain read-only`)
+  }
+  for (const path of [`posts/${id}`, `media/${id}/${id}`]) {
+    assert.equal((await request(env, path, 'GET', null, owner)).status, 404)
+  }
+  assert.deepEqual(storageAccesses, [], 'Static mode must not read even configured storage bindings')
+})
+
+test('database-backed feed failures remain errors with reader wording; write failures preserve edits', async t => {
+  t.mock.method(console, 'error', () => {})
+  const sqlite = new DatabaseSync(':memory:')
+  const unavailable = { prepare() { return { async all() { throw new Error('Simulated database outage') } } } }
+  try {
+    for (const [name, env] of [
+      ['missing binding', {}], ['missing schema', { DB: adapter(sqlite) }], ['database outage', { DB: unavailable }],
+    ]) {
+      assert.deepEqual(await request(env, 'posts'), {
+        status: 503, error: 'Writing is temporarily unavailable. Please try again.',
+      }, name)
+    }
+    const failedWrite = await request({ BLOG_OWNER_EMAIL: 'writer@example.test', BLOG_ORIGIN: origin }, 'posts', 'POST', initial, owner)
+    assert.deepEqual(failedWrite, {
+      status: 503, error: 'Writing is temporarily unavailable. Your edits have not been cleared. Please try again.',
+    })
   } finally { sqlite.close() }
 })
 
