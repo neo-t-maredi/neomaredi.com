@@ -4,6 +4,13 @@
   "name": "neomaredi-com",
   "main": "dist/server/index.js",
   "compatibility_date": "2026-11-13",
+  "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "neomaredi.com",
+      "custom_domain": true
+    }
+  ],
   "vars": {
     "WRITING_MODE": "static"
   },
